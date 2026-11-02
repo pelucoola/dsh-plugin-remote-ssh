@@ -1,5 +1,7 @@
 # 让 AI 直接接管你的服务器：dsh-plugin-remote-ssh 上手指南
 
+![封面](assets/promo-cover.png)
+
 > 一句话：给 DeepSeek Harness（DSH）装上「SSH 手脚」——智能体能连上你的远程主机执行命令，你可以在设置页里管理这些主机。连接可复用、超时能自适应、凭据不落地。
 
 ---
