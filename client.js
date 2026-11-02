@@ -159,33 +159,58 @@ window.__ModuleLoader__.load({
 
     // ---------------------------------------------------------------- RPC ---
 
-    /** @type {((endpoint: string, args: object) => Promise<any>) | null} */
-    let rpcCall = null
+    /**
+     * The Context this plugin was mounted on, used to resolve the `connection`
+     * service at call time. `connection` is declared in this plugin's `inject`
+     * list (see the module exports below), so the property read is legal; the
+     * `ctx.get` fallback keeps the UI diagnosable if a future composition
+     * provides it lazily.
+     * @type {any}
+     */
+    let pluginContext = null
 
     /** @param {any} ctx */
-    function makeRpcCall(ctx) {
+    function resolveConnection(ctx) {
       let connection
       try {
-        connection = ctx.connection ?? (typeof ctx.get === 'function' ? ctx.get('connection') : undefined)
+        connection = ctx.connection
       } catch {
         connection = undefined
       }
-      if (!connection || !connection.rpc || typeof connection.rpc.call !== 'function') return null
-      const call = connection.rpc.call.bind(connection.rpc)
-      return async (endpoint, args) => {
-        const response = await call('/api', endpoint, { args: args ?? {} })
-        if (response && response.ok === true) return response.value
-        const failure = response && response.error
-        throw new Error(failure && typeof failure.message === 'string' ? failure.message : 'RPC failed')
+      if ((connection === undefined || connection === null) && typeof ctx.get === 'function') {
+        try {
+          connection = ctx.get('connection')
+        } catch {
+          connection = undefined
+        }
       }
+      return connection
+    }
+
+    /**
+     * Call one Host RPC endpoint through the authenticated `/api` gateway.
+     * The connection is resolved per call rather than captured once, so a
+     * transport that mounts after this plugin cannot leave the page stuck in a
+     * permanently unavailable state.
+     * @param {string} endpoint - `<namespace>/<method>`.
+     * @param {object | undefined} args - wire arguments.
+     */
+    async function callEndpoint(endpoint, args) {
+      const connection = resolveConnection(pluginContext)
+      if (!connection || !connection.rpc || typeof connection.rpc.call !== 'function') {
+        throw new Error(
+          'unable to reach the Host: the client `connection` service is not mounted (host RPC unavailable)',
+        )
+      }
+      const response = await connection.rpc.call('/api', endpoint, { args: args ?? {} })
+      if (response && response.ok === true) return response.value
+      const failure = response && response.error
+      throw new Error(failure && typeof failure.message === 'string' ? failure.message : 'RPC failed')
     }
 
     /** @param {string} method */
     function rpc(method, args) {
-      if (rpcCall === null) {
-        return Promise.reject(new Error('Host RPC is unavailable in this deployment'))
-      }
-      return rpcCall('sshHosts/' + method, args)
+      return callEndpoint('sshHosts/' + method, args)
     }
 
     // ----------------------------------------------------------- component ---
@@ -683,9 +708,12 @@ window.__ModuleLoader__.load({
     const Section = withLocale(SSHHostsSection)
 
     return {
-      inject: ['slots'],
+      // `connection` is the authenticated Host transport service. It MUST be
+      // declared here: on a restricted client Context, reading an undeclared
+      // service throws instead of returning undefined.
+      inject: ['slots', 'connection'],
       apply(ctx) {
-        rpcCall = makeRpcCall(ctx)
+        pluginContext = ctx
         ctx.effect(() => installLocale(ctx), 'dsh-plugin-ssh: locale')
         ctx.effect(
           () =>
@@ -702,13 +730,6 @@ window.__ModuleLoader__.load({
             ),
           'dsh-plugin-ssh: settings section',
         )
-        if (rpcCall === null) {
-          try {
-            console.error('dsh-plugin-ssh: /api RPC is unavailable; the Settings page cannot manage hosts')
-          } catch {
-            /* ignore */
-          }
-        }
       },
     }
   },
