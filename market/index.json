@@ -28,9 +28,11 @@
       "versions": [
         {
           "version": "0.2.0",
-          "publishTimestamp": 1793621664,
+          "publishTimestamp": 1793622239,
           "source": {
-            "type": "npm"
+            "type": "git",
+            "url": "https://github.com/pelucoola/dsh-plugin-remote-ssh",
+            "commit": "ef08b4666812c402b47d85766d9811b07f3b77d6"
           },
           "engines": {
             "dsh": "^0.2.0-rc.5"
