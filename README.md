@@ -198,6 +198,10 @@ git commit -am "chore: switch market index to npm" && git push
 本仓库当前 Desktop 构建未挂载 Discover 页签（`plugins.tab` 无 occupant），所以本机请直接用
 `dsh plugin add` 安装。索引字段按官方 `dsh-plugin-market-index` 的 format 1 规则生成。
 
+## 了解更多
+
+- [推广文章：让 AI 直接接管你的服务器](docs/promo-zh.md) —— 安装、使用、/var 清理实战、安全设计与连接优化。
+
 ## 远端 Git
 
 仓库已推送到 GitHub（public）：
