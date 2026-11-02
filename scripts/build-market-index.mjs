@@ -14,6 +14,7 @@
  *
  * Format reference: dsh-plugin-market-index `parseMarketIndex` (format 1).
  */
+import { execFileSync } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -34,17 +35,34 @@ if (iconSvg.length > MAX_INLINE_ICON_BYTES) {
 const SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/
 if (!SEMVER.test(pkg.version)) throw new Error(`package.json version ${JSON.stringify(pkg.version)} is not exact SemVer`)
 
-const publishedAtArg = process.argv.indexOf('--published-at')
-const publishedAt = publishedAtArg >= 0 ? Number(process.argv[publishedAtArg + 1]) : Math.floor(Date.now() / 1000)
+const argAfter = (flag) => {
+  const index = process.argv.indexOf(flag)
+  return index >= 0 ? process.argv[index + 1] : undefined
+}
+
+const publishedAtArg = argAfter('--published-at')
+const publishedAt = publishedAtArg === undefined ? Math.floor(Date.now() / 1000) : Number(publishedAtArg)
 if (!Number.isInteger(publishedAt) || publishedAt < 0 || publishedAt >= 1e11) {
   throw new Error('--published-at must be an integer number of Unix seconds')
 }
+
+const sourceMode = argAfter('--source') ?? 'npm'
+if (sourceMode !== 'npm' && sourceMode !== 'git') throw new Error('--source must be "npm" or "git"')
 
 const repositoryUrl = String(pkg.repository?.url ?? '')
   .replace(/^git\+/, '')
   .replace(/\.git$/, '')
 if (!/^https?:\/\/[^/]+\/[^/]+\/[^/]+$/.test(repositoryUrl)) {
   throw new Error(`package.json repository.url does not name a flat GitHub-style repository: ${JSON.stringify(pkg.repository?.url)}`)
+}
+
+let source
+if (sourceMode === 'git') {
+  const commit = (argAfter('--commit') ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: fileURLToPath(root) }).toString()).trim().toLowerCase()
+  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error(`git commit ${JSON.stringify(commit)} is not a lowercase 40-hex SHA`)
+  source = { type: 'git', url: repositoryUrl, commit }
+} else {
+  source = { type: 'npm' }
 }
 
 const index = {
@@ -67,7 +85,7 @@ const index = {
         {
           version: pkg.version,
           publishTimestamp: publishedAt,
-          source: { type: 'npm' },
+          source,
           engines: pkg.engines?.dsh === undefined ? {} : { dsh: pkg.engines.dsh },
         },
       ],
@@ -80,4 +98,6 @@ await mkdir(new URL('market/', root), { recursive: true })
 await writeFile(out, JSON.stringify(index, null, 2) + '\n', 'utf8')
 
 const relative = fileURLToPath(out).slice(fileURLToPath(root).length)
-process.stdout.write(`wrote ${relative} (${pkg.name}@${pkg.version}, publishTimestamp ${publishedAt})\n`)
+process.stdout.write(
+  `wrote ${relative} (${pkg.name}@${pkg.version}, ${sourceMode === 'git' ? 'git ' + source.commit : 'npm'}, publishTimestamp ${publishedAt})\n`,
+)

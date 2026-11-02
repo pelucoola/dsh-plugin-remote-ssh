@@ -37,13 +37,25 @@ dsh-plugin-remote-ssh/
 
 ## 安装
 
-从 npm 安装（发布后可用，推荐给普通用户）：
+不需要 npm 账号：直接从这个 GitHub 仓库安装（推荐给普通用户）：
 
 ```sh
-dsh plugin --profile desktop add dsh-plugin-remote-ssh
+dsh plugin --profile desktop add git+https://github.com/pelucoola/dsh-plugin-remote-ssh.git
 ```
 
-开发时也可以直接安装本地目录（自动写 profile 依赖与 bundles 列表）：
+或在 DSH 的「插件 → 添加插件」里粘贴同一个 Git 地址。想锁定到某个版本时，用 commit：
+
+```sh
+dsh plugin --profile desktop add git+https://github.com/pelucoola/dsh-plugin-remote-ssh.git#<40位commit>
+```
+
+也可以下载 Release 里的压缩包后从本地路径安装：
+
+```
+https://github.com/pelucoola/dsh-plugin-remote-ssh/releases
+```
+
+开发时直接安装本地目录（自动写 profile 依赖与 bundles 列表）：
 
 ```
 plugin_manager / install_bundle → target = <本仓库绝对路径>
@@ -160,17 +172,26 @@ npm run smoke   # 手工 smoke：临时目录 + 假 ssh 可执行文件
 ## 市场（Discover）
 
 DSH 的市场是「用户配置索引 JSON」的机制，不是自动抓取 npm。本仓库在 `market/index.json`
-提供了一份 format 1 索引（图标内联、版本指向 npm），托管地址：
+提供了一份 format 1 索引，托管地址：
 
 ```
 https://raw.githubusercontent.com/pelucoola/dsh-plugin-remote-ssh/main/market/index.json
 ```
 
-安装 npm 版之后，每次发版执行：
+当前索引使用 **Git 源**（`source.type: "git"` + 固定 commit），因此不需要 npm 也能被市场安装。
+每次发版后刷新索引：
 
 ```sh
-npm run market:index -- --published-at <unix-seconds>
+npm run market:index -- --source git
 git commit -am "chore: refresh market index" && git push
+```
+
+以后有 npm 账号并发布成功时，改用 npm 源：
+
+```sh
+npm publish --registry https://registry.npmjs.org/ --access public
+npm run market:index -- --source npm --published-at "$(date +%s)"
+git commit -am "chore: switch market index to npm" && git push
 ```
 
 用户侧：在带 Discover 标签页的 DSH 构建里把上面的 URL 加为市场源，即可搜索/安装；
