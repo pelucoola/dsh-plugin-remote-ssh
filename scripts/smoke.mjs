@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Manual smoke test for the parts of dsh-plugin-ssh that do not need the DSH
+ * Manual smoke test for the parts of dsh-plugin-remote-ssh that do not need the DSH
  * runtime: the hosts document, the ssh argv builder and the process wrapper.
  *
  * It uses a fake `ssh` executable, so it never touches the network. Run with
@@ -15,7 +15,7 @@ import { createHostStore, hostDestination } from '../lib/hosts.js'
 import { buildSshArgs, runOnHost } from '../lib/ssh.js'
 import { resolveConfig } from '../lib/config.js'
 
-const home = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-smoke-home-'))
+const home = await mkdtemp(join(tmpdir(), 'dsh-plugin-remote-ssh-smoke-home-'))
 process.env.DSH_HOME = home
 const config = resolveConfig({})
 
@@ -23,7 +23,7 @@ function check(name) {
   process.stdout.write('ok - ' + name + '\n')
 }
 
-const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-smoke-'))
+const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-remote-ssh-smoke-'))
 try {
   const store = createHostStore({ file: join(dir, 'ssh-hosts.json') })
 

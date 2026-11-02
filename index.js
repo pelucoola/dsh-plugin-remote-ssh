@@ -1,5 +1,5 @@
 /**
- * Host half of dsh-plugin-ssh.
+ * Host half of dsh-plugin-remote-ssh.
  *
  * Publishes three things on the live Cordis Context:
  *
@@ -16,7 +16,7 @@
  * (agent keys, `~/.ssh/config`, or a configured identity file) performs
  * authentication.
  *
- * @module dsh-plugin-ssh
+ * @module dsh-plugin-remote-ssh
  */
 
 import { Config, resolveConfig } from './lib/config.js'
@@ -28,7 +28,7 @@ export const inject = ['tools', 'typert']
 
 export { Config }
 
-const PACKAGE = 'dsh-plugin-ssh'
+const PACKAGE = 'dsh-plugin-remote-ssh'
 const SERVICE = 'sshHosts'
 
 /**
@@ -471,7 +471,7 @@ export function apply(ctx, config) {
   const ssh = sshTool(store, resolved)
   const sshHosts = sshHostsTool(store, resolved)
 
-  ctx.effect(() => ctx.provide(SERVICE, service), 'dsh-plugin-ssh: sshHosts service')
+  ctx.effect(() => ctx.provide(SERVICE, service), 'dsh-plugin-remote-ssh: sshHosts service')
 
   ctx.effect(
     () =>
@@ -482,11 +482,11 @@ export function apply(ctx, config) {
         model: { services: [], events: [], objects: [] },
         invocations: RPC_METHODS.map(([method, wires]) => invocationFor(method, wires)),
       }),
-    'dsh-plugin-ssh: rpc descriptors',
+    'dsh-plugin-remote-ssh: rpc descriptors',
   )
 
-  ctx.effect(() => ctx.tools.register(ssh), 'dsh-plugin-ssh: ssh tool')
-  ctx.effect(() => ctx.tools.register(sshHosts), 'dsh-plugin-ssh: ssh_hosts tool')
+  ctx.effect(() => ctx.tools.register(ssh), 'dsh-plugin-remote-ssh: ssh tool')
+  ctx.effect(() => ctx.tools.register(sshHosts), 'dsh-plugin-remote-ssh: ssh_hosts tool')
 
   // Unloading the plugin must not leave background master connections behind.
   ctx.effect(
@@ -498,8 +498,8 @@ export function apply(ctx, config) {
         )
         .catch(() => {})
     },
-    'dsh-plugin-ssh: close reused connections',
+    'dsh-plugin-remote-ssh: close reused connections',
   )
 
-  ctx.logger?.debug?.('dsh-plugin-ssh: mounted (hosts file ' + store.file + ')')
+  ctx.logger?.debug?.('dsh-plugin-remote-ssh: mounted (hosts file ' + store.file + ')')
 }

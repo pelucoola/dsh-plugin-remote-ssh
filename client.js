@@ -1,5 +1,5 @@
 /**
- * Browser half of dsh-plugin-ssh: the "SSH 主机" section inside Settings.
+ * Browser half of dsh-plugin-remote-ssh: the "SSH 主机" section inside Settings.
  *
  * The section is a normal React component registered into the live
  * `settings.section` slot. It talks to its own Host half through the
@@ -10,7 +10,7 @@
  * module loader and must not import Harness Client packages.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-plugin-ssh',
+  id: 'dsh-plugin-remote-ssh',
   factory(require) {
     const React = require('react')
     const h = React.createElement
@@ -714,7 +714,7 @@ window.__ModuleLoader__.load({
       inject: ['slots', 'connection'],
       apply(ctx) {
         pluginContext = ctx
-        ctx.effect(() => installLocale(ctx), 'dsh-plugin-ssh: locale')
+        ctx.effect(() => installLocale(ctx), 'dsh-plugin-remote-ssh: locale')
         ctx.effect(
           () =>
             ctx.slots.inject('settings.section', () =>
@@ -728,7 +728,7 @@ window.__ModuleLoader__.load({
                 Section,
               ),
             ),
-          'dsh-plugin-ssh: settings section',
+          'dsh-plugin-remote-ssh: settings section',
         )
       },
     }

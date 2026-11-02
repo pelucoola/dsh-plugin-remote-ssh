@@ -21,7 +21,7 @@ const CONFIG = resolveConfig({})
 
 /** Create an executable fake `ssh` script in a fresh temporary directory. */
 async function withFakeSsh(body, run) {
-  const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-ssh-'))
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-remote-ssh-ssh-'))
   try {
     const binary = join(dir, 'fake-ssh')
     await writeFile(binary, '#!/bin/sh\n' + body + '\n', 'utf8')
@@ -38,7 +38,7 @@ async function withFakeSsh(body, run) {
  */
 async function withTempHome(run) {
   const previous = process.env.DSH_HOME
-  const home = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-home-'))
+  const home = await mkdtemp(join(tmpdir(), 'dsh-plugin-remote-ssh-home-'))
   process.env.DSH_HOME = home
   try {
     await run(home)

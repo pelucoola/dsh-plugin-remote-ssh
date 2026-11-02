@@ -44,7 +44,7 @@ async function loadRegistration() {
 
 test('client half registers the expected module id and required services', async () => {
   const registration = await loadRegistration()
-  assert.equal(registration.id, 'dsh-plugin-ssh')
+  assert.equal(registration.id, 'dsh-plugin-remote-ssh')
 
   const plugin = registration.factory((id) => {
     if (id === 'react') return ReactStub

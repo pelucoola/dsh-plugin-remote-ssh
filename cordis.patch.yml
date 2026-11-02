@@ -1,4 +1,4 @@
-# dsh-plugin-ssh bundle patch.
+# dsh-plugin-remote-ssh bundle patch.
 #
 # The Host half provides the `sshHosts` service, its typert RPC descriptors
 # (consumed by the Settings page through the /api gateway) and the `ssh` /
@@ -6,4 +6,4 @@
 # section. See README.md for the configuration keys.
 - insert:
     - id: ssh-hosts
-      name: dsh-plugin-ssh
+      name: dsh-plugin-remote-ssh

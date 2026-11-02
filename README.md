@@ -1,6 +1,8 @@
-# dsh-plugin-ssh
+# dsh-plugin-remote-ssh
 
 DSH（DeepSeek Harness）插件：让 DSH 通过 SSH 控制远程主机，并在 **设置 → SSH 主机** 里管理这些主机。
+
+> **English summary** — A DSH plugin that lets DSH control remote hosts over SSH: the agent gets `ssh` / `ssh_hosts` tools (connection reuse, adaptive wait times), and Settings → SSH Hosts manages saved hosts (add/edit/delete/test). No credentials are stored; the local `ssh` client handles authentication. Zero `@deepseek-ai/dsh-*` imports.
 
 - **智能体工具**
   - `ssh`：在已保存的主机上执行命令（支持 `cwd`、`stdin`；返回 exitCode / stdout / stderr）。
@@ -16,7 +18,7 @@ DSH（DeepSeek Harness）插件：让 DSH 通过 SSH 控制远程主机，并在
 ## 目录
 
 ```
-dsh-plugin-ssh/
+dsh-plugin-remote-ssh/
 ├─ index.js              # Host 半：sshHosts 服务 + typert RPC + 两个工具
 ├─ client.js             # 浏览器半：设置页里的「SSH 主机」section
 ├─ lib/
@@ -26,31 +28,38 @@ dsh-plugin-ssh/
 ├─ cordis.patch.yml      # bundle patch：插入 id 为 ssh-hosts 的插件行
 ├─ locale/{zh,en}.json   # 插件管理 / 设置里显示的标题与描述
 ├─ icon.svg              # 插件图标
+├─ market/index.json     # DSH 插件市场索引（format 1，随仓库托管）
 ├─ test/                 # node:test 单元测试（不联网）
-└─ scripts/smoke.mjs     # 手工 smoke（假 ssh，可执行文件）
+└─ scripts/
+   ├─ smoke.mjs          # 手工 smoke（假 ssh，可执行文件）
+   └─ build-market-index.mjs  # 生成/刷新 market/index.json
 ```
 
 ## 安装
 
-在 DSH 里用插件管理器安装本地目录（推荐，自动写 profile 依赖与 bundles 列表）：
+从 npm 安装（发布后可用，推荐给普通用户）：
+
+```sh
+dsh plugin --profile desktop add dsh-plugin-remote-ssh
+```
+
+开发时也可以直接安装本地目录（自动写 profile 依赖与 bundles 列表）：
 
 ```
 plugin_manager / install_bundle → target = <本仓库绝对路径>
 ```
 
-或者用 CLI：
-
 ```sh
-dsh plugin --profile desktop add /绝对路径/dsh-plugin-ssh
+dsh plugin --profile desktop add /绝对路径/dsh-plugin-remote-ssh
 ```
 
-本地目录安装会以 `link:` 依赖写进 profile，bundles 列表里追加 `dsh-plugin-ssh`；安装后立即生效。
+本地目录安装会以 `link:` 依赖写进 profile，bundles 列表里追加 `dsh-plugin-remote-ssh`；安装后立即生效。
 之后改了 Host/Client 代码，需要重新执行一次 `install_bundle`（或重启 DSH）才会加载新的 JS 模块。
 
 卸载：
 
 ```
-plugin_manager / remove_bundle → target = dsh-plugin-ssh
+plugin_manager / remove_bundle → target = dsh-plugin-remote-ssh
 ```
 
 主机清单 `$DSH_HOME/ssh-hosts.json` 不会被删除，需要时手动删。
@@ -61,7 +70,7 @@ plugin_manager / remove_bundle → target = dsh-plugin-ssh
 
 ```yaml
 - id: ssh-hosts
-  name: dsh-plugin-ssh
+  name: dsh-plugin-remote-ssh
   config:
     sshBinary: ssh              # 默认 ssh，走 PATH
     connectTimeoutSec: 10       # 1-120
@@ -148,13 +157,36 @@ npm run smoke   # 手工 smoke：临时目录 + 假 ssh 可执行文件
 - **动态超时**：idle timer 在 stdout/stderr 每次输出时重置；`maxTimeoutMs` 的 total timer 不重置。
   二者都只在超时后 `SIGTERM`，2 秒后补 `SIGKILL`；被取消（abort）则单独标记。
 
-## 远端 Git
+## 市场（Discover）
 
-本仓库是普通 git 仓库，`git init` 后已提交。需要推到远端时：
+DSH 的市场是「用户配置索引 JSON」的机制，不是自动抓取 npm。本仓库在 `market/index.json`
+提供了一份 format 1 索引（图标内联、版本指向 npm），托管地址：
+
+```
+https://raw.githubusercontent.com/pelucoola/dsh-plugin-remote-ssh/main/market/index.json
+```
+
+安装 npm 版之后，每次发版执行：
 
 ```sh
-git remote add origin git@github.com:<you>/dsh-plugin-ssh.git
-git push -u origin main
+npm run market:index -- --published-at <unix-seconds>
+git commit -am "chore: refresh market index" && git push
+```
+
+用户侧：在带 Discover 标签页的 DSH 构建里把上面的 URL 加为市场源，即可搜索/安装；
+本仓库当前 Desktop 构建未挂载 Discover 页签（`plugins.tab` 无 occupant），所以本机请直接用
+`dsh plugin add` 安装。索引字段按官方 `dsh-plugin-market-index` 的 format 1 规则生成。
+
+## 远端 Git
+
+仓库已推送到 GitHub（public）：
+
+```
+https://github.com/pelucoola/dsh-plugin-remote-ssh
+```
+
+```sh
+git push        # origin/main 已配置，可用 gh 凭据
 ```
 
 ## License

@@ -9,7 +9,7 @@ import { resolveConfig } from '../lib/config.js'
 
 /** Run one test against a store backed by a fresh temporary directory. */
 async function withStore(run) {
-  const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-hosts-'))
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-remote-ssh-hosts-'))
   try {
     await run(createHostStore({ file: join(dir, 'ssh-hosts.json') }), dir)
   } finally {
@@ -80,7 +80,7 @@ test('rejects duplicate names and unknown ids', async () => {
 })
 
 test('reports a corrupt hosts document instead of silently emptying it', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-corrupt-'))
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-plugin-remote-ssh-corrupt-'))
   try {
     const file = join(dir, 'ssh-hosts.json')
     await writeFile(file, '{ this is not json', 'utf8')
