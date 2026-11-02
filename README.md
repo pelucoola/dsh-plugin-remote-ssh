@@ -40,7 +40,16 @@ plugin_manager / install_bundle → target = <本仓库绝对路径>
 dsh plugin --profile desktop add /绝对路径/dsh-plugin-ssh
 ```
 
-安装后重启 DSH（本地目录安装是链接方式；首次安装即生效，之后改代码重装才会加载新的 JS 模块）。
+本地目录安装会以 `link:` 依赖写进 profile，bundles 列表里追加 `dsh-plugin-ssh`；安装后立即生效。
+之后改了 Host/Client 代码，需要重新执行一次 `install_bundle`（或重启 DSH）才会加载新的 JS 模块。
+
+卸载：
+
+```
+plugin_manager / remove_bundle → target = dsh-plugin-ssh
+```
+
+主机清单 `$DSH_HOME/ssh-hosts.json` 不会被删除，需要时手动删。
 
 ## 配置（bundle 行的 `config`）
 
