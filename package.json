@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-ssh",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "DSH plugin: control remote hosts over SSH from the agent, with a Settings page that manages saved hosts.",

@@ -3,8 +3,12 @@
 DSH（DeepSeek Harness）插件：让 DSH 通过 SSH 控制远程主机，并在 **设置 → SSH 主机** 里管理这些主机。
 
 - **智能体工具**
-  - `ssh`：在已保存的主机上执行命令（支持 `cwd`、`stdin`、超时；返回 exitCode / stdout / stderr）。
-  - `ssh_hosts`：List / Get / Add / Update / Remove / Test 已保存主机。
+  - `ssh`：在已保存的主机上执行命令（支持 `cwd`、`stdin`；返回 exitCode / stdout / stderr）。
+  - `ssh_hosts`：List / Get / Add / Update / Remove / Test / Disconnect 已保存主机。
+- **连接复用**：同一 DSH 进程内，对同一主机的多次调用复用一条后台 OpenSSH ControlMaster 连接
+  （首次握手，之后秒回；空闲 `sessionPersistSeconds` 秒后自动回收）。
+- **动态超时**：`timeoutMs` 是"静默超时"——只要命令还有输出（stdout/stderr）就会续命，
+  长时间构建/部署不会被 60 秒砍断；另有 `maxTimeoutMs` 硬上限兜底。
 - **设置界面**：`设置 → SSH 主机`，新增 / 编辑 / 删除 / 测试连接，支持用户、端口、私钥文件、ProxyJump、备注。
 - **同一份实现**：设置页通过 `/api` RPC 网关调用 Host 半边的 `sshHosts` 服务，Agent 工具调用同一批方法。
 - **零依赖**：Host 半与浏览器半都不 import 任何 `@deepseek-ai/dsh-*` 包，只骑运行时 Cordis Context。
@@ -59,10 +63,13 @@ plugin_manager / remove_bundle → target = dsh-plugin-ssh
 - id: ssh-hosts
   name: dsh-plugin-ssh
   config:
-    sshBinary: ssh            # 默认 ssh，走 PATH
-    connectTimeoutSec: 10     # 1-120
-    defaultTimeoutMs: 60000   # 1000-600000
-    maxOutputBytes: 200000    # 每个流截断阈值，4096-8MiB
+    sshBinary: ssh              # 默认 ssh，走 PATH
+    connectTimeoutSec: 10       # 1-120
+    defaultTimeoutMs: 120000    # 静默超时：多久没有输出就终止（1000-86400000）
+    maxTimeoutMs: 3600000       # 单次调用硬上限，无论是否有输出（60000-86400000）
+    maxOutputBytes: 200000      # 每个流截断阈值，4096-8MiB
+    reuseSession: true          # 复用后台 SSH 连接（Windows OpenSSH 不支持，自动关闭）
+    sessionPersistSeconds: 300  # 连接空闲多久后回收（0-86400）
 ```
 
 未知键会直接挂载失败（fail-loud），不会静默忽略拼写错误。
@@ -88,9 +95,23 @@ ssh_hosts(action: "test", id: "prod-web")
 
 调用 `ssh` 时 `host` 可以填主机 **id** 或**名称**；`host` 与 `command` 都省略时返回主机清单。
 
+```
+ssh(host: "prod-web", command: "npm run build", timeoutMs: 600000)   # 静默 10 分钟才放弃
+ssh(host: "prod-web", command: "systemctl status nginx")
+ssh_hosts(action: "disconnect", id: "prod-web")                      # 关闭这条复用连接
+```
+
+`timeoutMs` 是**静默超时**：命令持续输出就一直跑（最多到 `maxTimeoutMs` 硬上限）；完全没输出的
+命令超过该时间才会被杀，避免挂死。返回值里的 `timeoutKind`（`none` / `idle` / `total`）
+和 `sessionReused` 说明了这次的结果来源。
+
 ## 存储与安全
 
 - 主机清单：`$DSH_HOME/ssh-hosts.json`（0600；原子写：临时文件 + rename；进程内串行写）。
+- 复用的连接 socket：`$DSH_HOME/ssh-masters/m-<hash>.sock`（目录 0700，按连接参数哈希命名；
+  插件卸载时会尽力 `ssh -O exit` 关闭所有 master）。
+- 复用连接不保留远端交互式 shell 的状态（`cd`、临时环境变量等）：每次调用仍是独立命令，
+  目录用 `cwd` 指定或写进命令里。
 - **不保存任何密码 / 私钥内容**，只保存私钥路径。认证完全交给本机 SSH 客户端：
   `ssh-agent`、`~/.ssh/config`、或你在主机条目里指定的 `IdentityFile`。
 - 所有 ssh 调用固定 `-o BatchMode=yes`：不会弹出交互式密码提示；需要密码登录的主机请先配置公钥
@@ -122,6 +143,10 @@ npm run smoke   # 手工 smoke：临时目录 + 假 ssh 可执行文件
   文案走 `ctx.locale.register` + `bind`，中英文即时切换。
 - **工具**：`ctx.tools.register()` 注册普通对象（`output.schema` / `output.render` / `execute`），
   没有可用的 `defineTool` 依赖，故直接给注册表需要的最终 schema 形状。
+- **连接复用**：`ssh -o ControlMaster=auto -o ControlPath=<hash.sock> -o ControlPersist=<s>`；
+  连接身份只取 host/port/user/identityFile/proxyJump，改这些参数会自然换一条 master。
+- **动态超时**：idle timer 在 stdout/stderr 每次输出时重置；`maxTimeoutMs` 的 total timer 不重置。
+  二者都只在超时后 `SIGTERM`，2 秒后补 `SIGKILL`；被取消（abort）则单独标记。
 
 ## 远端 Git
 

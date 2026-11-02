@@ -21,7 +21,7 @@
 
 import { Config, resolveConfig } from './lib/config.js'
 import { createHostStore, hostDestination, normalizeHost } from './lib/hosts.js'
-import { runOnHost, testHost } from './lib/ssh.js'
+import { disconnectHost, runOnHost, testHost } from './lib/ssh.js'
 
 /** Services this plugin cannot run without. */
 export const inject = ['tools', 'typert']
@@ -145,6 +145,10 @@ function sshTool(store, config) {
       stderr: { type: 'string' },
       truncated: { type: 'boolean' },
       timedOut: { type: 'boolean' },
+      timeoutKind: { type: 'string', enum: ['none', 'idle', 'total'] },
+      idleTimeoutMs: { type: 'integer' },
+      maxTimeMs: { type: 'integer' },
+      sessionReused: { type: 'boolean' },
       durationMs: { type: 'integer' },
       error: { type: 'string' },
       message: { type: 'string' },
@@ -170,7 +174,10 @@ function sshTool(store, config) {
       'Omit `host` to list the configured hosts (the result carries their ids, names and destinations). ' +
       'The command runs in the remote user\'s login shell; `cwd` changes the remote working directory first ' +
       'and `stdin` is piped to the command. Returns exitCode, stdout and stderr — a non-zero exit code is data, ' +
-      'not an error. Authentication uses the user\'s own SSH configuration; this tool never accepts passwords ' +
+      'not an error. Repeated calls to the same host reuse one background SSH connection when supported ' +
+      '(`sessionReused` in the result), so only the first call pays the handshake. `timeoutMs` is an idle ' +
+      'window: output from either stream restarts it, and a hard `maxTimeMs` cap bounds the whole call. ' +
+      'Authentication uses the user\'s own SSH configuration; this tool never accepts passwords ' +
       'or ad-hoc destinations, so an unknown host must be added through `ssh_hosts` or the Settings page first.',
     parameters: {
       type: 'object',
@@ -191,7 +198,9 @@ function sshTool(store, config) {
         timeoutMs: {
           type: 'number',
           description:
-            'Command timeout in milliseconds (default ' + config.defaultTimeoutMs + ', max 600000).',
+            'Idle timeout in milliseconds (default ' + config.defaultTimeoutMs + '): the command is stopped only ' +
+            'after this long with NO output; any output restarts the clock. Raise it for long silent commands. ' +
+            'The hard total cap for one call is ' + config.maxTimeoutMs + ' ms.',
         },
         stdin: {
           type: 'string',
@@ -215,12 +224,15 @@ function sshTool(store, config) {
         }
         const status = value.ok
           ? 'exit ' + value.exitCode
-          : value.timedOut
-            ? 'timed out'
-            : value.error ?? 'exit ' + value.exitCode
+          : value.timeoutKind === 'idle'
+            ? 'idle timeout after ' + value.idleTimeoutMs + ' ms without output'
+            : value.timeoutKind === 'total'
+              ? 'hard time cap ' + value.maxTimeMs + ' ms reached'
+              : value.error ?? 'exit ' + value.exitCode
         lines.push(
           'ssh ' + (value.destination ?? value.host ?? '') + ' — ' + status +
-            ' (' + value.durationMs + ' ms' + (value.truncated ? ', output truncated' : '') + ')',
+            ' (' + value.durationMs + ' ms' + (value.truncated ? ', output truncated' : '') +
+            (value.sessionReused ? ', reused connection' : '') + ')',
         )
         if (value.stdout) lines.push('', value.stdout.replace(/\s+$/, ''))
         if (value.stderr) lines.push('', 'stderr:', value.stderr.replace(/\s+$/, ''))
@@ -321,15 +333,16 @@ function sshHostsTool(store, config) {
     description:
       'Manage the SSH hosts saved for the `ssh` tool. Actions: list (all saved hosts), get (one host), ' +
       'add (create from name/host/user/port/identityFile/proxyJump/description), update (requires id), ' +
-      'remove (id or name), test (probe reachability and report latency plus `uname`). Use this to add a host ' +
-      'the user asked you to work with, or to discover which hosts already exist before calling `ssh`.',
+      'remove (id or name), test (probe reachability and report latency plus `uname`), disconnect (close the ' +
+      'reused background SSH connection for a host). Use this to add a host the user asked you to work with, ' +
+      'or to discover which hosts already exist before calling `ssh`.',
     parameters: {
       type: 'object',
       additionalProperties: false,
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'get', 'add', 'update', 'remove', 'test'],
+          enum: ['list', 'get', 'add', 'update', 'remove', 'test', 'disconnect'],
           description: 'Operation to perform.',
         },
         ...fields,
@@ -346,6 +359,8 @@ function sshHostsTool(store, config) {
           host: hostSchema,
           hosts: { type: 'array', items: hostSchema },
           removed: { type: 'boolean' },
+          closed: { type: 'boolean' },
+          sessionReused: { type: 'boolean' },
           latencyMs: { type: 'integer' },
           output: { type: 'string' },
           stderr: { type: 'string' },
@@ -418,10 +433,27 @@ function sshHostsTool(store, config) {
         case 'test': {
           const host = await store.get(key)
           const result = await testHost(host, config, exec.signal)
-          return { ok: result.ok, action, host: { id: host.id, name: host.name, destination: hostDestination(host) }, latencyMs: result.latencyMs, output: result.output, stderr: result.stderr, ...(result.error === undefined ? {} : { error: result.error }) }
+          return { ok: result.ok, action, host: { id: host.id, name: host.name, destination: hostDestination(host) }, latencyMs: result.latencyMs, output: result.output, stderr: result.stderr, sessionReused: result.sessionReused, ...(result.error === undefined ? {} : { error: result.error }) }
+        }
+        case 'disconnect': {
+          const host = await store.get(key)
+          const result = await disconnectHost(host, config)
+          return {
+            ok: result.ok,
+            action,
+            closed: result.closed === true,
+            sessionReused: result.alreadyClosed !== true && result.closed === true,
+            host: { id: host.id, name: host.name, destination: hostDestination(host) },
+            message: result.closed
+              ? 'Closed the reused SSH connection for ' + host.name
+              : result.alreadyClosed
+                ? 'No reused SSH connection is open for ' + host.name
+                : 'Could not close the SSH connection: ' + (result.error ?? 'unknown error'),
+            ...(result.error === undefined ? {} : { error: result.error }),
+          }
         }
         default:
-          throw new Error('unknown action "' + action + '"; expected list/get/add/update/remove/test')
+          throw new Error('unknown action "' + action + '"; expected list/get/add/update/remove/test/disconnect')
       }
     },
   }
@@ -455,6 +487,19 @@ export function apply(ctx, config) {
 
   ctx.effect(() => ctx.tools.register(ssh), 'dsh-plugin-ssh: ssh tool')
   ctx.effect(() => ctx.tools.register(sshHosts), 'dsh-plugin-ssh: ssh_hosts tool')
+
+  // Unloading the plugin must not leave background master connections behind.
+  ctx.effect(
+    () => () => {
+      store
+        .list()
+        .then((document) =>
+          Promise.allSettled(document.hosts.map((host) => disconnectHost(host, resolved))),
+        )
+        .catch(() => {})
+    },
+    'dsh-plugin-ssh: close reused connections',
+  )
 
   ctx.logger?.debug?.('dsh-plugin-ssh: mounted (hosts file ' + store.file + ')')
 }

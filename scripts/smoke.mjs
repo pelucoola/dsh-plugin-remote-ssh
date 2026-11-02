@@ -15,6 +15,8 @@ import { createHostStore, hostDestination } from '../lib/hosts.js'
 import { buildSshArgs, runOnHost } from '../lib/ssh.js'
 import { resolveConfig } from '../lib/config.js'
 
+const home = await mkdtemp(join(tmpdir(), 'dsh-plugin-ssh-smoke-home-'))
+process.env.DSH_HOME = home
 const config = resolveConfig({})
 
 function check(name) {
@@ -69,4 +71,5 @@ try {
   process.stdout.write('\nsmoke ok\n')
 } finally {
   await rm(dir, { recursive: true, force: true })
+  await rm(home, { recursive: true, force: true })
 }
