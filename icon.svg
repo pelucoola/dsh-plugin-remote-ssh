@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="SSH remote hosts">
+  <defs>
+    <linearGradient id="sshx-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f7cf6"/>
+      <stop offset="1" stop-color="#1746a8"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#sshx-bg)"/>
+  <rect x="11" y="15" width="42" height="34" rx="7" fill="#08182e" opacity="0.92"/>
+  <path d="M19 25.5l6.5 6.5-6.5 6.5" fill="none" stroke="#7ff0c0" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M31.5 38.5h11" fill="none" stroke="#7ff0c0" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="45" cy="25" r="3.4" fill="#ffd166"/>
+</svg>

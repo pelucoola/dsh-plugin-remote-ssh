@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SSH Remote Hosts",
+    "description": "Let DSH control remote hosts over SSH: the agent runs commands through the ssh tool, and saved hosts are managed in Settings."
+  }
+}

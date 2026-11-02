@@ -1,0 +1,9 @@
+# dsh-plugin-ssh bundle patch.
+#
+# The Host half provides the `sshHosts` service, its typert RPC descriptors
+# (consumed by the Settings page through the /api gateway) and the `ssh` /
+# `ssh_hosts` agent tools. The browser half renders the "SSH 主机" settings
+# section. See README.md for the configuration keys.
+- insert:
+    - id: ssh-hosts
+      name: dsh-plugin-ssh
